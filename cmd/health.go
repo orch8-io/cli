@@ -21,7 +21,7 @@ var healthCmd = &cobra.Command{
 			output.JSON(resp)
 			return nil
 		}
-		fmt.Printf("Status: %s\n", resp.Status)
+		fmt.Fprintf(cmd.OutOrStdout(), "Status: %s\n", resp.Status)
 		return nil
 	},
 }

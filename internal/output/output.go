@@ -3,20 +3,25 @@ package output
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"text/tabwriter"
 )
 
-// JSON prints v as indented JSON to stdout.
+// Out is the default writer for all output functions.
+// It defaults to os.Stdout and can be overridden in tests.
+var Out io.Writer = os.Stdout
+
+// JSON prints v as indented JSON to Out.
 func JSON(v any) {
-	enc := json.NewEncoder(os.Stdout)
+	enc := json.NewEncoder(Out)
 	enc.SetIndent("", "  ")
 	enc.Encode(v)
 }
 
-// Table prints rows as an aligned table to stdout.
+// Table prints rows as an aligned table to Out.
 func Table(headers []string, rows [][]string) {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	w := tabwriter.NewWriter(Out, 0, 0, 2, ' ', 0)
 	for i, h := range headers {
 		if i > 0 {
 			fmt.Fprint(w, "\t")
