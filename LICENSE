@@ -1,0 +1,37 @@
+Business Source License 1.1
+
+License text copyright (c) 2017 MariaDB Corporation Ab, All Rights Reserved.
+"Business Source License" is a trademark of MariaDB Corporation Ab.
+
+Parameters
+
+Licensor:             Oleksii Vasylenko
+Licensed Work:        Orch8 CLI
+                      The Licensed Work is (c) 2024 Oleksii Vasylenko.
+Additional Use Grant: You may make use of the Licensed Work, provided that
+                      you may not use the Licensed Work for a Workflow
+                      Orchestration Service.
+
+                      A "Workflow Orchestration Service" is a commercial
+                      offering that allows third parties (other than your
+                      employees and contractors) to access the functionality
+                      of the Licensed Work by creating workflow definitions,
+                      executing workflow instances, or managing workflow
+                      state as a service.
+
+Change Date:          Four years from the date the Licensed Work is
+                      published.
+
+Change License:       Apache License, Version 2.0
+
+For information about alternative licensing arrangements for the Licensed
+Work, please contact hello@orch8.io.
+
+Notice
+
+The Business Source License (this document, or the "License") is not an
+Open Source license. However, the Licensed Work will eventually be made
+available under an Open Source License, as stated in this License.
+
+License text below is the full text of the BSL 1.1 as published at
+https://mariadb.com/bsl11/
