@@ -1,10 +1,10 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/orch8-io/cli/internal/output"
 	"github.com/spf13/cobra"
@@ -46,23 +46,36 @@ func init() {
 var instListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List instances",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		filters := map[string]string{"tenant_id": flagTenantID}
-		if v, _ := cmd.Flags().GetString("sequence"); v != "" {
+
+		if v, err := cmd.Flags().GetString("sequence"); err != nil {
+			return output.Errorf("reading --sequence flag: %w", err)
+		} else if v != "" {
 			filters["sequence_id"] = v
 		}
-		if v, _ := cmd.Flags().GetString("state"); v != "" {
+
+		if v, err := cmd.Flags().GetString("state"); err != nil {
+			return output.Errorf("reading --state flag: %w", err)
+		} else if v != "" {
 			filters["state"] = v
 		}
+
+		if limit, err := cmd.Flags().GetInt("limit"); err != nil {
+			return output.Errorf("reading --limit flag: %w", err)
+		} else if limit > 0 {
+			filters["limit"] = strconv.Itoa(limit)
+		}
+
 		instances, err := client.ListInstances(ctx, filters)
 		if err != nil {
-			output.Error("listing instances: %v", err)
+			return output.Errorf("listing instances: %w", err)
 		}
 		if flagJSON {
 			output.JSON(instances)
-			return
+			return nil
 		}
 		headers := []string{"ID", "SEQUENCE", "STATE", "CREATED"}
 		var rows [][]string
@@ -72,6 +85,7 @@ var instListCmd = &cobra.Command{
 			})
 		}
 		output.Table(headers, rows)
+		return nil
 	},
 }
 
@@ -79,37 +93,52 @@ var instGetCmd = &cobra.Command{
 	Use:   "get <id>",
 	Short: "Get instance details",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		inst, err := client.GetInstance(ctx, args[0])
 		if err != nil {
-			output.Error("getting instance: %v", err)
+			return output.Errorf("getting instance: %w", err)
 		}
-		output.JSON(inst)
+		if flagJSON {
+			output.JSON(inst)
+			return nil
+		}
+		fmt.Printf("ID:       %s\n", inst.ID)
+		fmt.Printf("Sequence: %s\n", inst.SequenceID)
+		fmt.Printf("State:    %s\n", inst.State)
+		fmt.Printf("Created:  %s\n", inst.CreatedAt)
+		return nil
 	},
 }
 
 var instCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new instance",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
-		seqID, _ := cmd.Flags().GetString("sequence")
+		ctx := cmd.Context()
+		seqID, err := cmd.Flags().GetString("sequence")
+		if err != nil {
+			return output.Errorf("reading --sequence flag: %w", err)
+		}
 
 		var ctxData any
-		if file, _ := cmd.Flags().GetString("context-file"); file != "" {
+		if file, err := cmd.Flags().GetString("context-file"); err != nil {
+			return output.Errorf("reading --context-file flag: %w", err)
+		} else if file != "" {
 			data, err := os.ReadFile(file)
 			if err != nil {
-				output.Error("reading context file: %v", err)
+				return output.Errorf("reading context file: %w", err)
 			}
 			if err := json.Unmarshal(data, &ctxData); err != nil {
-				output.Error("parsing context file: %v", err)
+				return output.Errorf("parsing context file: %w", err)
 			}
-		} else if inline, _ := cmd.Flags().GetString("context"); inline != "" {
+		} else if inline, err := cmd.Flags().GetString("context"); err != nil {
+			return output.Errorf("reading --context flag: %w", err)
+		} else if inline != "" {
 			if err := json.Unmarshal([]byte(inline), &ctxData); err != nil {
-				output.Error("parsing context JSON: %v", err)
+				return output.Errorf("parsing context JSON: %w", err)
 			}
 		}
 
@@ -120,19 +149,22 @@ var instCreateCmd = &cobra.Command{
 		if ctxData != nil {
 			body["context"] = ctxData
 		}
-		if key, _ := cmd.Flags().GetString("idempotency-key"); key != "" {
+		if key, err := cmd.Flags().GetString("idempotency-key"); err != nil {
+			return output.Errorf("reading --idempotency-key flag: %w", err)
+		} else if key != "" {
 			body["idempotency_key"] = key
 		}
 
 		inst, err := client.CreateInstance(ctx, body)
 		if err != nil {
-			output.Error("creating instance: %v", err)
+			return output.Errorf("creating instance: %w", err)
 		}
 		if flagJSON {
 			output.JSON(inst)
-			return
+			return nil
 		}
 		fmt.Printf("Created instance: %s\n", inst.ID)
+		return nil
 	},
 }
 
@@ -140,30 +172,33 @@ var instSignalCmd = &cobra.Command{
 	Use:   "signal <instance-id> <signal-type>",
 	Short: "Send a signal to an instance",
 	Args:  cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 
 		body := map[string]any{
 			"signal_type": args[1],
 		}
-		if p, _ := cmd.Flags().GetString("payload"); p != "" {
+		if p, err := cmd.Flags().GetString("payload"); err != nil {
+			return output.Errorf("reading --payload flag: %w", err)
+		} else if p != "" {
 			var payload any
 			if err := json.Unmarshal([]byte(p), &payload); err != nil {
-				output.Error("parsing payload: %v", err)
+				return output.Errorf("parsing payload: %w", err)
 			}
 			body["payload"] = payload
 		}
 
 		resp, err := client.SendSignal(ctx, args[0], body)
 		if err != nil {
-			output.Error("sending signal: %v", err)
+			return output.Errorf("sending signal: %w", err)
 		}
 		if flagJSON {
 			output.JSON(resp)
-			return
+			return nil
 		}
 		fmt.Printf("Signal sent: %s -> %s\n", args[1], args[0])
+		return nil
 	},
 }
 
@@ -171,13 +206,14 @@ var instPauseCmd = &cobra.Command{
 	Use:   "pause <id>",
 	Short: "Pause an instance",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		if err := client.UpdateInstanceState(ctx, args[0], map[string]any{"state": "Paused"}); err != nil {
-			output.Error("pausing instance: %v", err)
+			return output.Errorf("pausing instance: %w", err)
 		}
 		fmt.Println("Paused:", args[0])
+		return nil
 	},
 }
 
@@ -185,13 +221,14 @@ var instResumeCmd = &cobra.Command{
 	Use:   "resume <id>",
 	Short: "Resume a paused instance",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		if err := client.UpdateInstanceState(ctx, args[0], map[string]any{"state": "Pending"}); err != nil {
-			output.Error("resuming instance: %v", err)
+			return output.Errorf("resuming instance: %w", err)
 		}
 		fmt.Println("Resumed:", args[0])
+		return nil
 	},
 }
 
@@ -199,13 +236,14 @@ var instCancelCmd = &cobra.Command{
 	Use:   "cancel <id>",
 	Short: "Cancel a running instance",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		if err := client.UpdateInstanceState(ctx, args[0], map[string]any{"state": "Cancelled"}); err != nil {
-			output.Error("cancelling instance: %v", err)
+			return output.Errorf("cancelling instance: %w", err)
 		}
 		fmt.Println("Cancelled:", args[0])
+		return nil
 	},
 }
 
@@ -213,18 +251,19 @@ var instRetryCmd = &cobra.Command{
 	Use:   "retry <id>",
 	Short: "Retry a failed instance",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		inst, err := client.RetryInstance(ctx, args[0])
 		if err != nil {
-			output.Error("retrying instance: %v", err)
+			return output.Errorf("retrying instance: %w", err)
 		}
 		if flagJSON {
 			output.JSON(inst)
-			return
+			return nil
 		}
 		fmt.Printf("Retried: %s (state: %s)\n", inst.ID, inst.State)
+		return nil
 	},
 }
 
@@ -232,16 +271,16 @@ var instOutputsCmd = &cobra.Command{
 	Use:   "outputs <id>",
 	Short: "Get step outputs for an instance",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		outputs, err := client.GetOutputs(ctx, args[0])
 		if err != nil {
-			output.Error("getting outputs: %v", err)
+			return output.Errorf("getting outputs: %w", err)
 		}
 		if flagJSON {
 			output.JSON(outputs)
-			return
+			return nil
 		}
 		headers := []string{"BLOCK", "ATTEMPT", "SIZE", "CREATED"}
 		var rows [][]string
@@ -251,6 +290,7 @@ var instOutputsCmd = &cobra.Command{
 			})
 		}
 		output.Table(headers, rows)
+		return nil
 	},
 }
 
@@ -258,16 +298,16 @@ var instTreeCmd = &cobra.Command{
 	Use:   "tree <id>",
 	Short: "Get execution tree for an instance",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		tree, err := client.GetExecutionTree(ctx, args[0])
 		if err != nil {
-			output.Error("getting execution tree: %v", err)
+			return output.Errorf("getting execution tree: %w", err)
 		}
 		if flagJSON {
 			output.JSON(tree)
-			return
+			return nil
 		}
 		headers := []string{"BLOCK", "TYPE", "STATE", "STARTED", "COMPLETED"}
 		var rows [][]string
@@ -277,6 +317,7 @@ var instTreeCmd = &cobra.Command{
 			})
 		}
 		output.Table(headers, rows)
+		return nil
 	},
 }
 
@@ -284,16 +325,16 @@ var instAuditCmd = &cobra.Command{
 	Use:   "audit <id>",
 	Short: "Show audit log for an instance",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		entries, err := client.ListAuditLog(ctx, args[0])
 		if err != nil {
-			output.Error("getting audit log: %v", err)
+			return output.Errorf("getting audit log: %w", err)
 		}
 		if flagJSON {
 			output.JSON(entries)
-			return
+			return nil
 		}
 		headers := []string{"TIMESTAMP", "EVENT"}
 		var rows [][]string
@@ -301,22 +342,23 @@ var instAuditCmd = &cobra.Command{
 			rows = append(rows, []string{e.Timestamp, e.Event})
 		}
 		output.Table(headers, rows)
+		return nil
 	},
 }
 
 var instDLQCmd = &cobra.Command{
 	Use:   "dlq",
 	Short: "List dead letter queue instances",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		instances, err := client.ListDLQ(ctx, map[string]string{"tenant_id": flagTenantID})
 		if err != nil {
-			output.Error("listing DLQ: %v", err)
+			return output.Errorf("listing DLQ: %w", err)
 		}
 		if flagJSON {
 			output.JSON(instances)
-			return
+			return nil
 		}
 		headers := []string{"ID", "SEQUENCE", "STATE", "UPDATED"}
 		var rows [][]string
@@ -326,5 +368,6 @@ var instDLQCmd = &cobra.Command{
 			})
 		}
 		output.Table(headers, rows)
+		return nil
 	},
 }

@@ -13,6 +13,8 @@ var (
 	flagTenantID string
 	flagAPIKey   string
 	flagJSON     bool
+	flagVerbose  bool
+	version      = "dev"
 )
 
 var rootCmd = &cobra.Command{
@@ -26,6 +28,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flagTenantID, "tenant", envOr("ORCH8_TENANT", "default"), "Tenant ID ($ORCH8_TENANT)")
 	rootCmd.PersistentFlags().StringVar(&flagAPIKey, "api-key", os.Getenv("ORCH8_API_KEY"), "API key ($ORCH8_API_KEY)")
 	rootCmd.PersistentFlags().BoolVar(&flagJSON, "json", false, "Output as JSON")
+	rootCmd.PersistentFlags().BoolVar(&flagVerbose, "verbose", false, "Print request details")
 
 	rootCmd.AddCommand(sequenceCmd)
 	rootCmd.AddCommand(instanceCmd)
@@ -38,6 +41,11 @@ func init() {
 	rootCmd.AddCommand(healthCmd)
 	rootCmd.AddCommand(deployCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(completionCmd)
+	rootCmd.AddCommand(workerCmd)
+	rootCmd.AddCommand(poolCmd)
+	rootCmd.AddCommand(credentialCmd)
+	rootCmd.AddCommand(approvalCmd)
 }
 
 // Execute runs the root command.
@@ -68,7 +76,28 @@ func envOr(key, fallback string) string {
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print CLI version",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("orch8 v0.1.0")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Fprintln(cmd.OutOrStdout(), "orch8", version)
+		return nil
+	},
+}
+
+var completionCmd = &cobra.Command{
+	Use:   "completion [bash|zsh|fish|powershell]",
+	Short: "Generate shell completion script",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		switch args[0] {
+		case "bash":
+			return rootCmd.GenBashCompletion(os.Stdout)
+		case "zsh":
+			return rootCmd.GenZshCompletion(os.Stdout)
+		case "fish":
+			return rootCmd.GenFishCompletion(os.Stdout, true)
+		case "powershell":
+			return rootCmd.GenPowerShellCompletionWithDesc(os.Stdout)
+		default:
+			return fmt.Errorf("unsupported shell: %s", args[0])
+		}
 	},
 }

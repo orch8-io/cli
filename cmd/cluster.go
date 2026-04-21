@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/orch8-io/cli/internal/output"
@@ -21,16 +20,16 @@ func init() {
 var clusterListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List cluster nodes",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		nodes, err := client.ListClusterNodes(ctx)
 		if err != nil {
-			output.Error("listing nodes: %v", err)
+			return output.Errorf("listing nodes: %w", err)
 		}
 		if flagJSON {
 			output.JSON(nodes)
-			return
+			return nil
 		}
 		headers := []string{"ID", "ADDRESS", "STATE", "LAST HEARTBEAT"}
 		var rows [][]string
@@ -40,6 +39,7 @@ var clusterListCmd = &cobra.Command{
 			})
 		}
 		output.Table(headers, rows)
+		return nil
 	},
 }
 
@@ -47,12 +47,13 @@ var clusterDrainCmd = &cobra.Command{
 	Use:   "drain <node-id>",
 	Short: "Drain a node for graceful removal",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		if err := client.DrainNode(ctx, args[0]); err != nil {
-			output.Error("draining node: %v", err)
+			return output.Errorf("draining node: %w", err)
 		}
 		fmt.Println("Draining:", args[0])
+		return nil
 	},
 }

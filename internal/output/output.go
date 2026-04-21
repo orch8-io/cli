@@ -37,10 +37,10 @@ func Table(headers []string, rows [][]string) {
 	w.Flush()
 }
 
-// Error prints an error message to stderr and exits with code 1.
-func Error(msg string, args ...any) {
-	fmt.Fprintf(os.Stderr, "Error: "+msg+"\n", args...)
-	os.Exit(1)
+// Errorf formats an error message and returns it as an error.
+// Use with RunE: return output.Errorf("...", err)
+func Errorf(msg string, args ...any) error {
+	return fmt.Errorf(msg, args...)
 }
 
 // Truncate shortens s to maxLen with ellipsis.

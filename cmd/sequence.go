@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/orch8-io/cli/internal/output"
@@ -25,14 +24,22 @@ var seqGetCmd = &cobra.Command{
 	Use:   "get <id>",
 	Short: "Get a sequence by ID",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		seq, err := client.GetSequence(ctx, args[0])
 		if err != nil {
-			output.Error("getting sequence: %v", err)
+			return output.Errorf("getting sequence: %w", err)
 		}
-		output.JSON(seq)
+		if flagJSON {
+			output.JSON(seq)
+			return nil
+		}
+		fmt.Printf("ID:        %s\n", seq.ID)
+		fmt.Printf("Name:      %s\n", seq.Name)
+		fmt.Printf("Namespace: %s\n", seq.Namespace)
+		fmt.Printf("Version:   %d\n", seq.Version)
+		return nil
 	},
 }
 
@@ -40,14 +47,22 @@ var seqGetByNameCmd = &cobra.Command{
 	Use:   "get-by-name <namespace> <name>",
 	Short: "Look up a sequence by namespace and name",
 	Args:  cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		seq, err := client.GetSequenceByName(ctx, flagTenantID, args[0], args[1], nil)
 		if err != nil {
-			output.Error("getting sequence by name: %v", err)
+			return output.Errorf("getting sequence by name: %w", err)
 		}
-		output.JSON(seq)
+		if flagJSON {
+			output.JSON(seq)
+			return nil
+		}
+		fmt.Printf("ID:        %s\n", seq.ID)
+		fmt.Printf("Name:      %s\n", seq.Name)
+		fmt.Printf("Namespace: %s\n", seq.Namespace)
+		fmt.Printf("Version:   %d\n", seq.Version)
+		return nil
 	},
 }
 
@@ -55,13 +70,14 @@ var seqDeprecateCmd = &cobra.Command{
 	Use:   "deprecate <id>",
 	Short: "Mark a sequence as deprecated",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		if err := client.DeprecateSequence(ctx, args[0]); err != nil {
-			output.Error("deprecating sequence: %v", err)
+			return output.Errorf("deprecating sequence: %w", err)
 		}
 		fmt.Println("Deprecated:", args[0])
+		return nil
 	},
 }
 
@@ -69,16 +85,16 @@ var seqVersionsCmd = &cobra.Command{
 	Use:   "versions <namespace> <name>",
 	Short: "List all versions of a sequence",
 	Args:  cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		versions, err := client.ListSequenceVersions(ctx, flagTenantID, args[0], args[1])
 		if err != nil {
-			output.Error("listing versions: %v", err)
+			return output.Errorf("listing versions: %w", err)
 		}
 		if flagJSON {
 			output.JSON(versions)
-			return
+			return nil
 		}
 		headers := []string{"ID", "VERSION", "DEPRECATED", "CREATED"}
 		var rows [][]string
@@ -88,5 +104,6 @@ var seqVersionsCmd = &cobra.Command{
 			})
 		}
 		output.Table(headers, rows)
+		return nil
 	},
 }

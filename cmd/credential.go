@@ -9,39 +9,39 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var pluginCmd = &cobra.Command{
-	Use:   "plugin",
-	Short: "Manage plugins",
+var credentialCmd = &cobra.Command{
+	Use:   "credential",
+	Short: "Manage credentials",
 }
 
 func init() {
-	pluginCmd.AddCommand(plugListCmd)
-	pluginCmd.AddCommand(plugGetCmd)
-	pluginCmd.AddCommand(plugCreateCmd)
-	pluginCmd.AddCommand(plugDeleteCmd)
+	credentialCmd.AddCommand(credListCmd)
+	credentialCmd.AddCommand(credGetCmd)
+	credentialCmd.AddCommand(credCreateCmd)
+	credentialCmd.AddCommand(credDeleteCmd)
 
-	plugCreateCmd.Flags().String("file", "", "Path to plugin JSON file")
+	credCreateCmd.Flags().String("file", "", "Path to credential JSON file")
 }
 
-var plugListCmd = &cobra.Command{
+var credListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List plugins",
+	Short: "List credentials",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
 		ctx := cmd.Context()
-		plugins, err := client.ListPlugins(ctx, flagTenantID)
+		creds, err := client.ListCredentials(ctx, flagTenantID)
 		if err != nil {
-			return output.Errorf("listing plugins: %w", err)
+			return output.Errorf("listing credentials: %w", err)
 		}
 		if flagJSON {
-			output.JSON(plugins)
+			output.JSON(creds)
 			return nil
 		}
-		headers := []string{"NAME", "TYPE", "ENABLED"}
+		headers := []string{"ID", "NAME", "TYPE"}
 		var rows [][]string
-		for _, p := range plugins {
+		for _, c := range creds {
 			rows = append(rows, []string{
-				p.Name, p.PluginType, fmt.Sprintf("%v", p.Enabled),
+				c.ID, c.Name, c.CredentialType,
 			})
 		}
 		output.Table(headers, rows)
@@ -49,30 +49,31 @@ var plugListCmd = &cobra.Command{
 	},
 }
 
-var plugGetCmd = &cobra.Command{
-	Use:   "get <name>",
-	Short: "Get a plugin by name",
+var credGetCmd = &cobra.Command{
+	Use:   "get <id>",
+	Short: "Get a credential by ID",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
 		ctx := cmd.Context()
-		p, err := client.GetPlugin(ctx, args[0])
+		c, err := client.GetCredential(ctx, args[0])
 		if err != nil {
-			return output.Errorf("getting plugin: %w", err)
+			return output.Errorf("getting credential: %w", err)
 		}
 		if flagJSON {
-			output.JSON(p)
+			output.JSON(c)
 			return nil
 		}
-		fmt.Printf("Name: %s\n", p.Name)
-		fmt.Printf("Type: %s\n", p.PluginType)
+		fmt.Printf("ID:   %s\n", c.ID)
+		fmt.Printf("Name: %s\n", c.Name)
+		fmt.Printf("Type: %s\n", c.CredentialType)
 		return nil
 	},
 }
 
-var plugCreateCmd = &cobra.Command{
+var credCreateCmd = &cobra.Command{
 	Use:   "create",
-	Short: "Register a plugin from JSON file",
+	Short: "Create a credential from JSON file",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
 		ctx := cmd.Context()
@@ -91,28 +92,28 @@ var plugCreateCmd = &cobra.Command{
 		if err := json.Unmarshal(data, &body); err != nil {
 			return output.Errorf("parsing JSON: %w", err)
 		}
-		p, err := client.CreatePlugin(ctx, body)
+		c, err := client.CreateCredential(ctx, body)
 		if err != nil {
-			return output.Errorf("creating plugin: %w", err)
+			return output.Errorf("creating credential: %w", err)
 		}
 		if flagJSON {
-			output.JSON(p)
+			output.JSON(c)
 			return nil
 		}
-		fmt.Printf("Created plugin: %s\n", p.Name)
+		fmt.Printf("Created credential: %s\n", c.ID)
 		return nil
 	},
 }
 
-var plugDeleteCmd = &cobra.Command{
-	Use:   "delete <name>",
-	Short: "Delete a plugin",
+var credDeleteCmd = &cobra.Command{
+	Use:   "delete <id>",
+	Short: "Delete a credential",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
 		ctx := cmd.Context()
-		if err := client.DeletePlugin(ctx, args[0]); err != nil {
-			return output.Errorf("deleting plugin: %w", err)
+		if err := client.DeleteCredential(ctx, args[0]); err != nil {
+			return output.Errorf("deleting credential: %w", err)
 		}
 		fmt.Println("Deleted:", args[0])
 		return nil

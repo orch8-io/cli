@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -29,16 +28,16 @@ func init() {
 var cronListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List cron schedules",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		crons, err := client.ListCron(ctx, flagTenantID)
 		if err != nil {
-			output.Error("listing cron schedules: %v", err)
+			return output.Errorf("listing cron schedules: %w", err)
 		}
 		if flagJSON {
 			output.JSON(crons)
-			return
+			return nil
 		}
 		headers := []string{"ID", "EXPR", "TIMEZONE", "ENABLED", "SEQUENCE", "NEXT FIRE"}
 		var rows [][]string
@@ -52,6 +51,7 @@ var cronListCmd = &cobra.Command{
 			})
 		}
 		output.Table(headers, rows)
+		return nil
 	},
 }
 
@@ -59,44 +59,55 @@ var cronGetCmd = &cobra.Command{
 	Use:   "get <id>",
 	Short: "Get a cron schedule",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		cron, err := client.GetCron(ctx, args[0])
 		if err != nil {
-			output.Error("getting cron: %v", err)
+			return output.Errorf("getting cron: %w", err)
 		}
-		output.JSON(cron)
+		if flagJSON {
+			output.JSON(cron)
+			return nil
+		}
+		fmt.Printf("ID:       %s\n", cron.ID)
+		fmt.Printf("Expr:     %s\n", cron.CronExpr)
+		fmt.Printf("Enabled:  %v\n", cron.Enabled)
+		return nil
 	},
 }
 
 var cronCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a cron schedule from JSON file",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
-		file, _ := cmd.Flags().GetString("file")
+		ctx := cmd.Context()
+		file, err := cmd.Flags().GetString("file")
+		if err != nil {
+			return output.Errorf("reading --file flag: %w", err)
+		}
 		if file == "" {
-			output.Error("--file is required")
+			return output.Errorf("--file is required")
 		}
 		data, err := os.ReadFile(file)
 		if err != nil {
-			output.Error("reading file: %v", err)
+			return output.Errorf("reading file: %w", err)
 		}
 		var body map[string]any
 		if err := json.Unmarshal(data, &body); err != nil {
-			output.Error("parsing JSON: %v", err)
+			return output.Errorf("parsing JSON: %w", err)
 		}
 		cron, err := client.CreateCron(ctx, body)
 		if err != nil {
-			output.Error("creating cron: %v", err)
+			return output.Errorf("creating cron: %w", err)
 		}
 		if flagJSON {
 			output.JSON(cron)
-			return
+			return nil
 		}
 		fmt.Printf("Created cron: %s\n", cron.ID)
+		return nil
 	},
 }
 
@@ -104,13 +115,14 @@ var cronDeleteCmd = &cobra.Command{
 	Use:   "delete <id>",
 	Short: "Delete a cron schedule",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		if err := client.DeleteCron(ctx, args[0]); err != nil {
-			output.Error("deleting cron: %v", err)
+			return output.Errorf("deleting cron: %w", err)
 		}
 		fmt.Println("Deleted:", args[0])
+		return nil
 	},
 }
 
@@ -118,13 +130,14 @@ var cronEnableCmd = &cobra.Command{
 	Use:   "enable <id>",
 	Short: "Enable a cron schedule",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		if _, err := client.UpdateCron(ctx, args[0], map[string]any{"enabled": true}); err != nil {
-			output.Error("enabling cron: %v", err)
+			return output.Errorf("enabling cron: %w", err)
 		}
 		fmt.Println("Enabled:", args[0])
+		return nil
 	},
 }
 
@@ -132,12 +145,13 @@ var cronDisableCmd = &cobra.Command{
 	Use:   "disable <id>",
 	Short: "Disable a cron schedule",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		if _, err := client.UpdateCron(ctx, args[0], map[string]any{"enabled": false}); err != nil {
-			output.Error("disabling cron: %v", err)
+			return output.Errorf("disabling cron: %w", err)
 		}
 		fmt.Println("Disabled:", args[0])
+		return nil
 	},
 }

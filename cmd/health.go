@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/orch8-io/cli/internal/output"
@@ -11,17 +10,18 @@ import (
 var healthCmd = &cobra.Command{
 	Use:   "health",
 	Short: "Check engine health",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		resp, err := client.Health(ctx)
 		if err != nil {
-			output.Error("health check failed: %v", err)
+			return output.Errorf("health check failed: %w", err)
 		}
 		if flagJSON {
 			output.JSON(resp)
-			return
+			return nil
 		}
 		fmt.Printf("Status: %s\n", resp.Status)
+		return nil
 	},
 }

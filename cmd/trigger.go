@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -29,16 +28,16 @@ func init() {
 var trigListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List triggers",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		triggers, err := client.ListTriggers(ctx, flagTenantID)
 		if err != nil {
-			output.Error("listing triggers: %v", err)
+			return output.Errorf("listing triggers: %w", err)
 		}
 		if flagJSON {
 			output.JSON(triggers)
-			return
+			return nil
 		}
 		headers := []string{"SLUG", "TYPE", "SEQUENCE", "ENABLED"}
 		var rows [][]string
@@ -48,6 +47,7 @@ var trigListCmd = &cobra.Command{
 			})
 		}
 		output.Table(headers, rows)
+		return nil
 	},
 }
 
@@ -55,44 +55,55 @@ var trigGetCmd = &cobra.Command{
 	Use:   "get <slug>",
 	Short: "Get a trigger by slug",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		t, err := client.GetTrigger(ctx, args[0])
 		if err != nil {
-			output.Error("getting trigger: %v", err)
+			return output.Errorf("getting trigger: %w", err)
 		}
-		output.JSON(t)
+		if flagJSON {
+			output.JSON(t)
+			return nil
+		}
+		fmt.Printf("Slug:     %s\n", t.Slug)
+		fmt.Printf("Sequence: %s\n", t.SequenceName)
+		fmt.Printf("Enabled:  %v\n", t.Enabled)
+		return nil
 	},
 }
 
 var trigCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a trigger from JSON file",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
-		file, _ := cmd.Flags().GetString("file")
+		ctx := cmd.Context()
+		file, err := cmd.Flags().GetString("file")
+		if err != nil {
+			return output.Errorf("reading --file flag: %w", err)
+		}
 		if file == "" {
-			output.Error("--file is required")
+			return output.Errorf("--file is required")
 		}
 		data, err := os.ReadFile(file)
 		if err != nil {
-			output.Error("reading file: %v", err)
+			return output.Errorf("reading file: %w", err)
 		}
 		var body map[string]any
 		if err := json.Unmarshal(data, &body); err != nil {
-			output.Error("parsing JSON: %v", err)
+			return output.Errorf("parsing JSON: %w", err)
 		}
 		t, err := client.CreateTrigger(ctx, body)
 		if err != nil {
-			output.Error("creating trigger: %v", err)
+			return output.Errorf("creating trigger: %w", err)
 		}
 		if flagJSON {
 			output.JSON(t)
-			return
+			return nil
 		}
 		fmt.Printf("Created trigger: %s\n", t.Slug)
+		return nil
 	},
 }
 
@@ -100,13 +111,14 @@ var trigDeleteCmd = &cobra.Command{
 	Use:   "delete <slug>",
 	Short: "Delete a trigger",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		if err := client.DeleteTrigger(ctx, args[0]); err != nil {
-			output.Error("deleting trigger: %v", err)
+			return output.Errorf("deleting trigger: %w", err)
 		}
 		fmt.Println("Deleted:", args[0])
+		return nil
 	},
 }
 
@@ -114,23 +126,26 @@ var trigFireCmd = &cobra.Command{
 	Use:   "fire <slug>",
 	Short: "Fire a trigger manually",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
-		ctx := context.Background()
+		ctx := cmd.Context()
 		var payload any
-		if p, _ := cmd.Flags().GetString("payload"); p != "" {
+		if p, err := cmd.Flags().GetString("payload"); err != nil {
+			return output.Errorf("reading --payload flag: %w", err)
+		} else if p != "" {
 			if err := json.Unmarshal([]byte(p), &payload); err != nil {
-				output.Error("parsing payload: %v", err)
+				return output.Errorf("parsing payload: %w", err)
 			}
 		}
 		resp, err := client.FireTrigger(ctx, args[0], payload)
 		if err != nil {
-			output.Error("firing trigger: %v", err)
+			return output.Errorf("firing trigger: %w", err)
 		}
 		if flagJSON {
 			output.JSON(resp)
-			return
+			return nil
 		}
 		fmt.Printf("Fired trigger %s -> instance %s\n", args[0], resp.InstanceID)
+		return nil
 	},
 }
