@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/orch8-io/cli/internal/output"
 	"github.com/spf13/cobra"
@@ -19,10 +20,14 @@ func init() {
 	sessionCmd.AddCommand(sessCreateCmd)
 	sessionCmd.AddCommand(sessInstancesCmd)
 	sessionCmd.AddCommand(sessCloseCmd)
+	sessionCmd.AddCommand(sessUpdateDataCmd)
 
 	sessCreateCmd.Flags().String("key", "", "Session key (required)")
 	sessCreateCmd.Flags().String("data", "", "Session data as JSON")
 	sessCreateCmd.MarkFlagRequired("key")
+
+	sessUpdateDataCmd.Flags().String("data", "", "Session data as JSON string")
+	sessUpdateDataCmd.Flags().String("data-file", "", "Path to JSON file with session data")
 }
 
 var sessGetCmd = &cobra.Command{
@@ -143,6 +148,53 @@ var sessCloseCmd = &cobra.Command{
 			return output.Errorf("closing session: %w", err)
 		}
 		fmt.Println("Closed:", args[0])
+		return nil
+	},
+}
+
+var sessUpdateDataCmd = &cobra.Command{
+	Use:   "update-data <id>",
+	Short: "Update session data",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client := newClient()
+		ctx := cmd.Context()
+
+		dataStr, _ := cmd.Flags().GetString("data")
+		dataFile, _ := cmd.Flags().GetString("data-file")
+
+		if dataStr == "" && dataFile == "" {
+			return output.Errorf("either --data or --data-file is required")
+		}
+		if dataStr != "" && dataFile != "" {
+			return output.Errorf("specify only one of --data or --data-file")
+		}
+
+		var raw []byte
+		if dataFile != "" {
+			var err error
+			raw, err = os.ReadFile(dataFile)
+			if err != nil {
+				return output.Errorf("reading data file: %w", err)
+			}
+		} else {
+			raw = []byte(dataStr)
+		}
+
+		var body any
+		if err := json.Unmarshal(raw, &body); err != nil {
+			return output.Errorf("parsing JSON: %w", err)
+		}
+
+		sess, err := client.UpdateSessionData(ctx, args[0], body)
+		if err != nil {
+			return output.Errorf("updating session data: %w", err)
+		}
+		if flagJSON {
+			output.JSON(sess)
+			return nil
+		}
+		fmt.Printf("Updated session: %s\n", sess.ID)
 		return nil
 	},
 }

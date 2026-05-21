@@ -19,8 +19,10 @@ func init() {
 	pluginCmd.AddCommand(plugGetCmd)
 	pluginCmd.AddCommand(plugCreateCmd)
 	pluginCmd.AddCommand(plugDeleteCmd)
+	pluginCmd.AddCommand(plugUpdateCmd)
 
 	plugCreateCmd.Flags().String("file", "", "Path to plugin JSON file")
+	plugUpdateCmd.Flags().String("file", "", "Path to JSON file with update fields (required)")
 }
 
 var plugListCmd = &cobra.Command{
@@ -115,6 +117,41 @@ var plugDeleteCmd = &cobra.Command{
 			return output.Errorf("deleting plugin: %w", err)
 		}
 		fmt.Println("Deleted:", args[0])
+		return nil
+	},
+}
+
+var plugUpdateCmd = &cobra.Command{
+	Use:   "update <name>",
+	Short: "Update a plugin",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client := newClient()
+		ctx := cmd.Context()
+		file, err := cmd.Flags().GetString("file")
+		if err != nil {
+			return output.Errorf("reading --file flag: %w", err)
+		}
+		if file == "" {
+			return output.Errorf("--file is required")
+		}
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return output.Errorf("reading file: %w", err)
+		}
+		var body map[string]any
+		if err := json.Unmarshal(data, &body); err != nil {
+			return output.Errorf("parsing JSON: %w", err)
+		}
+		p, err := client.UpdatePlugin(ctx, args[0], body)
+		if err != nil {
+			return output.Errorf("updating plugin: %w", err)
+		}
+		if flagJSON {
+			output.JSON(p)
+			return nil
+		}
+		fmt.Printf("Updated: %s\n", p.Name)
 		return nil
 	},
 }

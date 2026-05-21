@@ -28,11 +28,17 @@ var approvalListCmd = &cobra.Command{
 			output.JSON(approvals)
 			return nil
 		}
-		headers := []string{"ID", "SEQUENCE", "STATE", "CREATED"}
+		headers := []string{"INSTANCE", "SEQUENCE", "BLOCK", "PROMPT", "WAITING SINCE", "DEADLINE"}
 		var rows [][]string
-		for _, a := range approvals {
+		for _, a := range approvals.Items {
+			deadline := ""
+			if a.Deadline != nil {
+				deadline = *a.Deadline
+			}
 			rows = append(rows, []string{
-				a.ID, a.SequenceID, a.State, a.CreatedAt,
+				a.InstanceID, a.SequenceName, a.BlockID,
+				output.Truncate(a.Prompt, 40),
+				a.WaitingSince, deadline,
 			})
 		}
 		output.Table(headers, rows)

@@ -25,7 +25,7 @@ var cbListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
 		ctx := cmd.Context()
-		breakers, err := client.ListCircuitBreakers(ctx)
+		breakers, err := client.ListTenantCircuitBreakers(ctx, flagTenantID)
 		if err != nil {
 			return output.Errorf("listing circuit breakers: %w", err)
 		}
@@ -52,7 +52,7 @@ var cbGetCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
 		ctx := cmd.Context()
-		b, err := client.GetCircuitBreaker(ctx, args[0])
+		b, err := client.GetTenantCircuitBreaker(ctx, flagTenantID, args[0])
 		if err != nil {
 			return output.Errorf("getting circuit breaker: %w", err)
 		}
@@ -73,7 +73,7 @@ var cbResetCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
 		ctx := cmd.Context()
-		if err := client.ResetCircuitBreaker(ctx, args[0]); err != nil {
+		if err := client.ResetTenantCircuitBreaker(ctx, flagTenantID, args[0]); err != nil {
 			return output.Errorf("resetting circuit breaker: %w", err)
 		}
 		fmt.Println("Reset:", args[0])

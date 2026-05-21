@@ -3,7 +3,7 @@ module github.com/orch8-io/cli
 go 1.21
 
 require (
-	github.com/orch8-io/sdk-go v0.1.0
+	github.com/orch8-io/sdk-go v0.2.0
 	github.com/spf13/cobra v1.8.1
 )
 

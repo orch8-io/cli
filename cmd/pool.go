@@ -20,8 +20,13 @@ func init() {
 	poolCmd.AddCommand(poolCreateCmd)
 	poolCmd.AddCommand(poolDeleteCmd)
 	poolCmd.AddCommand(poolResourcesCmd)
+	poolCmd.AddCommand(poolAddResourceCmd)
+	poolCmd.AddCommand(poolUpdateResourceCmd)
+	poolCmd.AddCommand(poolDeleteResourceCmd)
 
 	poolCreateCmd.Flags().String("file", "", "Path to pool JSON file")
+	poolAddResourceCmd.Flags().String("file", "", "Path to resource JSON file (required)")
+	poolUpdateResourceCmd.Flags().String("file", "", "Path to resource JSON file (required)")
 }
 
 var poolListCmd = &cobra.Command{
@@ -146,6 +151,91 @@ var poolResourcesCmd = &cobra.Command{
 			})
 		}
 		output.Table(headers, rows)
+		return nil
+	},
+}
+
+var poolAddResourceCmd = &cobra.Command{
+	Use:   "add-resource <pool-id>",
+	Short: "Add a resource to a pool",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client := newClient()
+		ctx := cmd.Context()
+		file, err := cmd.Flags().GetString("file")
+		if err != nil {
+			return output.Errorf("reading --file flag: %w", err)
+		}
+		if file == "" {
+			return output.Errorf("--file is required")
+		}
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return output.Errorf("reading file: %w", err)
+		}
+		var body map[string]any
+		if err := json.Unmarshal(data, &body); err != nil {
+			return output.Errorf("parsing JSON: %w", err)
+		}
+		r, err := client.CreatePoolResource(ctx, args[0], body)
+		if err != nil {
+			return output.Errorf("adding pool resource: %w", err)
+		}
+		if flagJSON {
+			output.JSON(r)
+			return nil
+		}
+		fmt.Printf("Added resource: %s\n", r.ID)
+		return nil
+	},
+}
+
+var poolUpdateResourceCmd = &cobra.Command{
+	Use:   "update-resource <pool-id> <resource-id>",
+	Short: "Update a resource in a pool",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client := newClient()
+		ctx := cmd.Context()
+		file, err := cmd.Flags().GetString("file")
+		if err != nil {
+			return output.Errorf("reading --file flag: %w", err)
+		}
+		if file == "" {
+			return output.Errorf("--file is required")
+		}
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return output.Errorf("reading file: %w", err)
+		}
+		var body map[string]any
+		if err := json.Unmarshal(data, &body); err != nil {
+			return output.Errorf("parsing JSON: %w", err)
+		}
+		r, err := client.UpdatePoolResource(ctx, args[0], args[1], body)
+		if err != nil {
+			return output.Errorf("updating pool resource: %w", err)
+		}
+		if flagJSON {
+			output.JSON(r)
+			return nil
+		}
+		fmt.Printf("Updated resource: %s\n", r.ID)
+		return nil
+	},
+}
+
+var poolDeleteResourceCmd = &cobra.Command{
+	Use:   "delete-resource <pool-id> <resource-id>",
+	Short: "Delete a resource from a pool",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client := newClient()
+		ctx := cmd.Context()
+		if err := client.DeletePoolResource(ctx, args[0], args[1]); err != nil {
+			return output.Errorf("deleting pool resource: %w", err)
+		}
+		fmt.Println("Deleted:", args[1])
 		return nil
 	},
 }

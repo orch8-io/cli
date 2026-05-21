@@ -18,6 +18,16 @@ func init() {
 	sequenceCmd.AddCommand(seqGetByNameCmd)
 	sequenceCmd.AddCommand(seqDeprecateCmd)
 	sequenceCmd.AddCommand(seqVersionsCmd)
+	sequenceCmd.AddCommand(seqListCmd)
+	sequenceCmd.AddCommand(seqDeleteCmd)
+	sequenceCmd.AddCommand(seqMigrateInstanceCmd)
+
+	seqListCmd.Flags().String("namespace", "", "Filter by namespace")
+
+	seqMigrateInstanceCmd.Flags().String("instance", "", "Instance ID (required)")
+	seqMigrateInstanceCmd.Flags().String("target-sequence", "", "Target sequence ID (required)")
+	seqMigrateInstanceCmd.MarkFlagRequired("instance")
+	seqMigrateInstanceCmd.MarkFlagRequired("target-sequence")
 }
 
 var seqGetCmd = &cobra.Command{
@@ -104,6 +114,92 @@ var seqVersionsCmd = &cobra.Command{
 			})
 		}
 		output.Table(headers, rows)
+		return nil
+	},
+}
+
+var seqListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List sequences",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client := newClient()
+		ctx := cmd.Context()
+		filter := map[string]string{}
+
+		if v, err := cmd.Flags().GetString("namespace"); err != nil {
+			return output.Errorf("reading --namespace flag: %w", err)
+		} else if v != "" {
+			filter["namespace"] = v
+		}
+
+		sequences, err := client.ListSequences(ctx, filter)
+		if err != nil {
+			return output.Errorf("listing sequences: %w", err)
+		}
+		if flagJSON {
+			output.JSON(sequences)
+			return nil
+		}
+		headers := []string{"ID", "NAME", "NAMESPACE", "VERSION", "DEPRECATED"}
+		var rows [][]string
+		for _, s := range sequences {
+			rows = append(rows, []string{
+				s.ID, s.Name, s.Namespace, fmt.Sprintf("%d", s.Version), fmt.Sprintf("%v", s.Deprecated),
+			})
+		}
+		output.Table(headers, rows)
+		return nil
+	},
+}
+
+var seqDeleteCmd = &cobra.Command{
+	Use:   "delete <id>",
+	Short: "Delete a sequence by ID",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client := newClient()
+		ctx := cmd.Context()
+		if err := client.DeleteSequence(ctx, args[0]); err != nil {
+			return output.Errorf("deleting sequence: %w", err)
+		}
+		fmt.Println("Deleted:", args[0])
+		return nil
+	},
+}
+
+var seqMigrateInstanceCmd = &cobra.Command{
+	Use:   "migrate-instance",
+	Short: "Migrate an instance to a new sequence version",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client := newClient()
+		ctx := cmd.Context()
+
+		instanceID, err := cmd.Flags().GetString("instance")
+		if err != nil {
+			return output.Errorf("reading --instance flag: %w", err)
+		}
+		targetSeqID, err := cmd.Flags().GetString("target-sequence")
+		if err != nil {
+			return output.Errorf("reading --target-sequence flag: %w", err)
+		}
+
+		body := map[string]any{
+			"instance_id":        instanceID,
+			"target_sequence_id": targetSeqID,
+		}
+
+		inst, err := client.MigrateInstance(ctx, body)
+		if err != nil {
+			return output.Errorf("migrating instance: %w", err)
+		}
+		if flagJSON {
+			output.JSON(inst)
+			return nil
+		}
+		fmt.Printf("ID:       %s\n", inst.ID)
+		fmt.Printf("Sequence: %s\n", inst.SequenceID)
+		fmt.Printf("State:    %s\n", inst.State)
+		fmt.Printf("Created:  %s\n", inst.CreatedAt)
 		return nil
 	},
 }

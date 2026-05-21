@@ -19,8 +19,10 @@ func init() {
 	credentialCmd.AddCommand(credGetCmd)
 	credentialCmd.AddCommand(credCreateCmd)
 	credentialCmd.AddCommand(credDeleteCmd)
+	credentialCmd.AddCommand(credUpdateCmd)
 
 	credCreateCmd.Flags().String("file", "", "Path to credential JSON file")
+	credUpdateCmd.Flags().String("file", "", "Path to JSON file with update fields (required)")
 }
 
 var credListCmd = &cobra.Command{
@@ -116,6 +118,41 @@ var credDeleteCmd = &cobra.Command{
 			return output.Errorf("deleting credential: %w", err)
 		}
 		fmt.Println("Deleted:", args[0])
+		return nil
+	},
+}
+
+var credUpdateCmd = &cobra.Command{
+	Use:   "update <id>",
+	Short: "Update a credential",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client := newClient()
+		ctx := cmd.Context()
+		file, err := cmd.Flags().GetString("file")
+		if err != nil {
+			return output.Errorf("reading --file flag: %w", err)
+		}
+		if file == "" {
+			return output.Errorf("--file is required")
+		}
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return output.Errorf("reading file: %w", err)
+		}
+		var body map[string]any
+		if err := json.Unmarshal(data, &body); err != nil {
+			return output.Errorf("parsing JSON: %w", err)
+		}
+		c, err := client.UpdateCredential(ctx, args[0], body)
+		if err != nil {
+			return output.Errorf("updating credential: %w", err)
+		}
+		if flagJSON {
+			output.JSON(c)
+			return nil
+		}
+		fmt.Printf("Updated: %s\n", c.ID)
 		return nil
 	},
 }

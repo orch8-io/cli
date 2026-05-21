@@ -46,6 +46,7 @@ func init() {
 	rootCmd.AddCommand(poolCmd)
 	rootCmd.AddCommand(credentialCmd)
 	rootCmd.AddCommand(approvalCmd)
+	rootCmd.AddCommand(rollbackPolicyCmd)
 }
 
 // Execute runs the root command.
